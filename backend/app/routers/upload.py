@@ -4,6 +4,7 @@ import shutil
 import os
 from ..database import get_db
 from ..models import document as models
+from ..models import user as user_models
 from ..schemas import document as schemas
 from ..utils import security
 
@@ -18,7 +19,7 @@ UPLOAD_DIR = "backend/uploads"
 async def upload_document(
     doc_type: str,
     file: UploadFile = File(...),
-    current_user: models.User = Depends(security.get_current_user),
+    current_user: user_models.User = Depends(security.get_current_user),
     db: Session = Depends(get_db)
 ):
     if not os.path.exists(UPLOAD_DIR):

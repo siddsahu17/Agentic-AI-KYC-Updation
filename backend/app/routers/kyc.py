@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import kyc as models
+from ..models import user as user_models
 from ..models import document as doc_models
 from ..schemas import kyc as schemas
 from ..utils import security
-from ..services import agent_stub
+from ..services import agent_stub, ocr_service, document_classifier, aadhaar_agent
+from ..models import document as doc_models
 
 router = APIRouter(
     prefix="/kyc",
@@ -14,7 +16,7 @@ router = APIRouter(
 
 @router.post("/start", response_model=schemas.KYCRecord)
 async def start_kyc(
-    current_user: models.User = Depends(security.get_current_user),
+    current_user: user_models.User = Depends(security.get_current_user),
     db: Session = Depends(get_db)
 ):
     # Check if pending KYC exists
@@ -50,7 +52,7 @@ async def start_kyc(
 @router.get("/{kyc_id}", response_model=schemas.KYCRecord)
 def get_kyc(
     kyc_id: int,
-    current_user: models.User = Depends(security.get_current_user),
+    current_user: user_models.User = Depends(security.get_current_user),
     db: Session = Depends(get_db)
 ):
     kyc = db.query(models.KYCRecord).filter(models.KYCRecord.id == kyc_id).first()
@@ -63,7 +65,7 @@ def get_kyc(
 @router.post("/confirm", response_model=schemas.KYCRecord)
 def confirm_kyc(
     kyc_update: schemas.KYCUpdate,
-    current_user: models.User = Depends(security.get_current_user),
+    current_user: user_models.User = Depends(security.get_current_user),
     db: Session = Depends(get_db)
 ):
     # Find the latest review_needed KYC
@@ -80,3 +82,32 @@ def confirm_kyc(
     db.commit()
     db.refresh(kyc)
     return kyc
+
+@router.post("/extract/aadhaar")
+async def extract_aadhaar(
+    file_path: str, # In real app, might upload file here or pass ID
+    current_user: user_models.User = Depends(security.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Extracts Aadhaar data from a given file path (must be uploaded first).
+    """
+    # 1. Run OCR
+    raw_text = ocr_service.extract_text(file_path)
+    if not raw_text:
+        raise HTTPException(status_code=400, detail="OCR failed to extract text")
+        
+    # 2. Classify
+    doc_type = document_classifier.classify_document(raw_text)
+    if doc_type != "AADHAAR":
+        return {
+            "error": "Document not recognized as Aadhaar",
+            "detected_type": doc_type,
+            "raw_text_preview": raw_text[:100]
+        }
+        
+    # 3. Extract Fields
+    extracted_data = aadhaar_agent.extract_aadhaar_fields(raw_text)
+    
+    return extracted_data
+

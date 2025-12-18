@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import kyc as models
+from ..models import user as user_models
 from ..schemas import kyc as schemas
 from ..utils import security
 
@@ -13,7 +14,7 @@ router = APIRouter(
 @router.get("/{kyc_id}", response_model=schemas.KYCRecord)
 def get_status(
     kyc_id: int,
-    current_user: models.User = Depends(security.get_current_user),
+    current_user: user_models.User = Depends(security.get_current_user),
     db: Session = Depends(get_db)
 ):
     kyc = db.query(models.KYCRecord).filter(models.KYCRecord.id == kyc_id).first()
