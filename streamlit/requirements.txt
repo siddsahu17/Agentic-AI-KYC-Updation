@@ -1,0 +1,10 @@
+streamlit
+pytesseract
+paddleocr
+
+pypdfium2
+pillow
+transformers
+torch
+opencv-python-headless
+numpy
